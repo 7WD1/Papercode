@@ -100,9 +100,15 @@ code/
 │   ├── __init__.py
 │   └── metrics.py                # F1, AUROC, FAR, detection delay, Cohen's d
 │
-└── scripts/
-    ├── train.py                  # Standalone training entry point
-    └── evaluate.py               # Standalone evaluation entry point
+├── scripts/
+│   ├── train.py                  # Standalone training entry point
+│   └── evaluate.py               # Standalone evaluation entry point
+│
+└── revise/                       # ★ Supplementary material (paper response)
+    ├── README.md                 #   Index of representative samples
+    ├── SPSD/                     #   10 normal + 10 anomalous CSV windows
+    ├── HPMD/
+    └── BMSD/
 ```
 
 ---
@@ -313,13 +319,14 @@ The `data/data_loader.py` module additionally provides:
 - `get_all_datasets()` — aggregator returning all configured datasets via the
   device-port interface (mock replay by default).
 
-> **Data availability:** The three datasets (SPSD, HPMD, BMSD), the full
-> preprocessing scripts, the train/validation/test split indices, and the
-> hyperparameter configuration files will be released in this repository upon
-> paper acceptance. **Representative data samples (10 normal and 10 anomalous
-> windows per dataset, in CSV format) are provided as supplementary material in
-> the [`revise/`](revise/) folder** — see [`revise/README.md`](revise/README.md)
-> for the per-dataset layout and column schema.
+> **Data availability:** The complete codebase (HRLAD + all 11 baselines, data
+> loaders, preprocessing scripts, configuration files, and train/eval entry
+> points) and the three datasets (SPSD, HPMD, BMSD) are open-sourced in this
+> repository at <https://github.com/7WD1/Papercode>. **Representative data
+> samples (10 normal and 10 anomalous windows per dataset, in CSV format) are
+> provided in the [`revise/`](revise/) folder** — see
+> [`revise/README.md`](revise/README.md) for the per-dataset layout and column
+> schema.
 > The fixed random seeds are `{42, 123, 456, 789, 2024, 314, 271, 1618, 999,
 > 2048}`, and all reported results are averaged over these 10 independent runs.
 > Preprocessing follows Z-score normalization, windowing ($w = 64$, stride 1),
