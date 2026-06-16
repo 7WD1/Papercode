@@ -44,6 +44,20 @@ data/processed/
 *.pkl
 *.h5
 
+# Supplementary CSV samples under revise/ ARE tracked (force-include below).
+# These are the small representative samples (10 normal + 10 anomalous windows
+# per dataset) shipped as supplementary material per the paper.
+!revise/**/*.csv
+
+# Local generator / scratch scripts — not part of the released package.
+generate_revise_samples.py
+_smoke_test.py
+_smoke_test2.py
+_diag.py
+_smoke_result*.txt
+_smoke_result.txt
+revise/_summary.txt
+
 # Model checkpoints
 checkpoints/
 *.pt

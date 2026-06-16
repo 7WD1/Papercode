@@ -316,8 +316,10 @@ The `data/data_loader.py` module additionally provides:
 > **Data availability:** The three datasets (SPSD, HPMD, BMSD), the full
 > preprocessing scripts, the train/validation/test split indices, and the
 > hyperparameter configuration files will be released in this repository upon
-> paper acceptance. Representative data samples (10 normal and 10 anomalous
-> windows per dataset, in CSV format) are provided as supplementary material.
+> paper acceptance. **Representative data samples (10 normal and 10 anomalous
+> windows per dataset, in CSV format) are provided as supplementary material in
+> the [`revise/`](revise/) folder** — see [`revise/README.md`](revise/README.md)
+> for the per-dataset layout and column schema.
 > The fixed random seeds are `{42, 123, 456, 789, 2024, 314, 271, 1618, 999,
 > 2048}`, and all reported results are averaged over these 10 independent runs.
 > Preprocessing follows Z-score normalization, windowing ($w = 64$, stride 1),

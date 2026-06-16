@@ -39,6 +39,15 @@ from typing import Iterable, Optional, Sequence, Tuple
 import numpy as np
 
 
+# Paper Section V-B: sliding-window length w = 64. Used to size injected events
+# so that windows of this length can be cut from anomalous regions.
+try:
+    from config import Config as _Cfg
+    WINDOW_REF = int(getattr(_Cfg, "window_size", 64))
+except Exception:                                # pragma: no cover
+    WINDOW_REF = 64
+
+
 # ---------------------------------------------------------------------------
 # Exceptions
 # ---------------------------------------------------------------------------
@@ -158,6 +167,17 @@ class DevicePort(abc.ABC):
         this base method layers the injection protocol described in the paper
         (response R1-C5): gradual 200-800 ms onset ramp, sensor-noise-floor
         noise, user-behaviour confounds, and 15 % channel occlusion.
+
+        Event structure follows the paper's event-level annotation (onset ->
+        resolution). Each injected event has three phases:
+
+            [onset ramp: 200-800 ms] -> [plateau] -> [resolution decay]
+
+        so the *labelled* window is the full onset..resolution interval, not
+        just the ramp. The 200-800 ms value from the paper is the *onset ramp
+        duration* only; the full event length is set so the average event
+        duration matches the full dataset's (#events, #samples) statistics
+        (e.g. BMSD: 1142 events over 3.89M samples ~ 3400 samples/event).
         """
         from config import Config
         rng = np.random.RandomState(self.seed)
@@ -167,27 +187,55 @@ class DevicePort(abc.ABC):
         labels = np.zeros(n, dtype=int)
         modes = np.zeros(n, dtype=int)                 # 0=normal,1=degr,2=warn,3=fault
 
-        # event-level injection: anomaly_ratio of samples grouped into events
-        n_events = max(1, int(round(self.anomaly_ratio * n / 20.0)))
-        onset_lo = int(round(Config.injection_gradual_onset_ms[0] * fs / 1000.0))
+        meta = self.meta
+        # Number of events to inject, scaled from the full-dataset event
+        # density (n_anomaly_events / total_samples events per sample). This
+        # keeps the *frequency* of anomaly events faithful to the paper even
+        # at the smaller demo length n. We floor at 1 and cap so events stay
+        # non-overlapping.
+        full_events = float(meta["n_anomaly_events"])
+        full_samples = float(meta["total_samples"])
+        event_density = full_events / full_samples          # events per sample
+        n_events = max(1, int(round(event_density * n)))
+        target_anom_samples = self.anomaly_ratio * n
+        # Average event length (onset..resolution) at demo scale: derived from
+        # the target anomaly mass and the (scaled) number of events, so events
+        # are long enough to host 64-sample windows but numerous enough to
+        # match the paper's event count.
+        avg_event_len = max(WINDOW_REF * 2,
+                            int(round(target_anom_samples / n_events)))
+        # onset ramp duration (200-800 ms), in samples
+        onset_lo = max(1, int(round(Config.injection_gradual_onset_ms[0]
+                                    * fs / 1000.0)))
         onset_hi = max(onset_lo + 1,
-                       int(round(Config.injection_gradual_onset_ms[1] * fs / 1000.0)))
-        ev_len = max(onset_hi, int(round(0.02 * n / n_events)))
+                       int(round(Config.injection_gradual_onset_ms[1]
+                                 * fs / 1000.0)))
+
         injected = 0
         attempts = 0
         type_choice = list(range(len(self.anomaly_types)))
-        while injected < self.anomaly_ratio * n and attempts < n_events * 4:
+        max_attempts = max(n_events * 6, 50)
+        while (injected < target_anom_samples * 0.9
+               and attempts < max_attempts):
             attempts += 1
-            start = rng.randint(int(0.1 * n), n - ev_len - 1)
+            # event length: ramp + plateau + resolution, jittered around the mean
+            ramp = int(rng.randint(onset_lo, onset_hi + 1))
+            resolution = max(WINDOW_REF // 4, rng.randint(onset_lo, onset_hi + 1))
+            plateau = max(0, avg_event_len - ramp - resolution)
+            ev_len = ramp + plateau + resolution
+            if ev_len >= n - 2:
+                continue
+            start = rng.randint(int(0.05 * n), n - ev_len - 1)
             if labels[start:start + ev_len].any():
                 continue
             atype = self.anomaly_types[rng.choice(type_choice)]
-            ramp = int(rng.randint(onset_lo, onset_hi + 1))
             amp = rng.uniform(3.0, 6.0) if "surge" in atype or "spike" in atype \
                 else rng.uniform(1.5, 3.5)
-            # gradual onset envelope over the first `ramp` samples
-            env = np.ones(ev_len)
+            # three-phase envelope: linear ramp up -> plateau -> linear decay
+            env = np.zeros(ev_len)
             env[:ramp] = np.linspace(0.0, 1.0, ramp)
+            env[ramp:ramp + plateau] = 1.0
+            env[ramp + plateau:] = np.linspace(1.0, 0.0, resolution)
             ch = rng.randint(0, self.n_channels)
             Y[start:start + ev_len, ch] += amp * env
             modes[start:start + ev_len] = 3            # fault mode
