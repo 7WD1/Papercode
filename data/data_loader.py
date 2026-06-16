@@ -264,11 +264,26 @@ def load_yahoo_s5(data_dir=None):
     return datasets
 
 
-def get_all_datasets(nab_dir=None, yahoo_dir=None):
+def get_all_datasets(nab_dir=None, yahoo_dir=None, use_mock=True,
+                     n_samples=5000, seed=42):
     """Get all available datasets for evaluation.
 
+    The three consumer-electronics datasets (SPSD/HPMD/BMSD) are now acquired
+    through the device-port interface in :mod:`data.device_ports`, which reads
+    samples from the paper-declared physical devices (Android phones, Modbus/TCP
+    power meters, SMBus BMS controller) when present and falls back to a
+    deterministic mock replay otherwise (``use_mock=True`` is the default so the
+    public repository runs out-of-the-box).
+
+    Per the paper (main.tex L572) the detector operates on a single
+    validation-selected scalar channel: ``accel_x`` for SPSD, ``active_power``
+    (refrigerator) for HPMD, ``cell_voltage`` for BMSD.  This function therefore
+    returns the *selected* 1-D channel for each dataset, preserving the existing
+    contract consumed by ``run_experiment.py`` and ``FeatureExtractor``.
+
     Returns:
-        datasets: dict of dataset_name -> (values, labels)
+        datasets: dict of dataset_name -> (values_1d, labels)
+            where ``values_1d`` is the paper-selected scalar channel.
     """
     all_datasets = {}
 
@@ -282,11 +297,15 @@ def get_all_datasets(nab_dir=None, yahoo_dir=None):
     for name, values, labels in yahoo_data:
         all_datasets[f'Yahoo_{name}'] = (values, labels)
 
-    # Synthetic consumer electronics datasets
-    for ds_type, ds_name in [('smartphone', 'SPSD'),
-                              ('appliance', 'HPMD'),
-                              ('battery', 'BMSD')]:
-        values, labels = generate_synthetic_ce_data(ds_type, n_samples=5000)
-        all_datasets[ds_name] = (values, labels)
+    # Consumer-electronics datasets via the device-port interface.
+    # Lazily imported so the rest of this module works without the port layer.
+    from .device_ports import open_port
+    for ds_name in ('SPSD', 'HPMD', 'BMSD'):
+        with open_port(ds_name, n_samples=n_samples, seed=seed,
+                       use_mock=use_mock) as port:
+            Y, labels = port.acquire(n_samples=n_samples)   # (n, n_channels), (n,)
+            # Paper L572: use the validation-selected best scalar channel.
+            values_1d = port.selected_channel(Y)
+        all_datasets[ds_name] = (values_1d, labels)
 
     return all_datasets

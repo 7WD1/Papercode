@@ -59,6 +59,93 @@ class Config:
     # === Dataset names (paper Section V-A) ===
     datasets = ['SPSD', 'HPMD', 'BMSD']
 
+    # === Dataset metadata (paper Section V-A and consolidated table tab:r1_datasets) ===
+    # Every value below is copied verbatim from the manuscript; the synthetic
+    # generators in data/data_loader.py read these so that the public code is
+    # guaranteed to match the paper's dataset description.
+    dataset_meta = {
+        'SPSD': {
+            'full_name': 'Smartphone Sensor Dataset',
+            'domain': 'Smartphone sensors (accelerometer + gyroscope)',
+            'sampling_rate_hz': 50,        # 50 Hz
+            'n_channels': 6,               # 6 input channels (3 accel + 3 gyro)
+            'channel_names': ['accel_x', 'accel_y', 'accel_z',
+                              'gyro_x', 'gyro_y', 'gyro_z'],
+            'selected_channel': 'accel_x', # paper L572 selection rule
+            'devices': ['Samsung Galaxy S23', 'Xiaomi 13', 'OnePlus 11'],  # 3 phones
+            'n_devices': 3,
+            'anomaly_types': [             # 4 anomaly types
+                'free-fall detection failure',
+                'gyroscope drift',
+                'accelerometer noise surge',
+                'sensor fusion anomaly',
+            ],
+            'n_anomaly_types': 4,
+            'n_anomaly_events': 1584,      # 1,584 annotated events
+            'total_samples': 4_320_000,    # 4.32M effective samples
+            'train_samples': 3_020_000,    # 3.02M
+            'val_samples':   650_000,      # 0.65M
+            'test_samples':  650_000,      # 0.65M
+            'anomaly_ratio': 0.037,        # 3.7% (test)
+            'monitoring_days': 30,
+            'inter_annotator_kappa': 0.92, # Cohen's kappa > 0.92
+        },
+        'HPMD': {
+            'full_name': 'Home Appliance Power Monitoring Dataset',
+            'domain': 'Home appliance power monitoring',
+            'sampling_rate_hz': 1,         # 1 Hz
+            'n_channels': 3,               # 3 input channels (power of 3 appliances)
+            'channel_names': ['refrigerator_power', 'ac_power', 'washer_power'],
+            'selected_channel': 'refrigerator_power',  # = active power, paper L572
+            'devices': ['LG GR-B247 refrigerator',
+                        'Daikin FTXTA35 air conditioner',
+                        'LG WD-T14410 washing machine'],  # 3 appliances
+            'n_devices': 3,
+            'anomaly_types': [             # 3 anomaly types
+                'compressor start failure',
+                'inverter abnormal oscillation',
+                'motor stalling',
+            ],
+            'n_anomaly_types': 3,
+            'n_anomaly_events': 1276,      # 1,276 annotated events
+            'total_samples': 5_180_000,    # 5.18M effective samples
+            'train_samples': 3_630_000,    # 3.63M
+            'val_samples':   780_000,      # 0.78M
+            'test_samples':  780_000,      # 0.78M
+            'anomaly_ratio': 0.029,        # 2.9% (test)
+            'monitoring_days': 60,
+            'inter_annotator_kappa': 0.92,
+        },
+        'BMSD': {
+            'full_name': 'Battery Management System Dataset',
+            'domain': 'Battery management (V / I / T)',
+            'sampling_rate_hz': 10,        # 10 Hz
+            'n_channels': 3,               # 3 input channels (voltage, current, temperature)
+            'channel_names': ['cell_voltage', 'pack_current', 'temperature'],
+            'selected_channel': 'cell_voltage',  # paper L572
+            'devices': ['4S2P lithium-polymer pack (14.8 V, 5000 mAh)'],  # 1 battery pack
+            'n_devices': 1,
+            'anomaly_types': [             # 3 anomaly types
+                'overcharge / over-discharge',
+                'thermal runaway precursor',
+                'internal resistance degradation',
+            ],
+            'n_anomaly_types': 3,
+            'n_anomaly_events': 1142,      # 1,142 annotated events
+            'total_samples': 3_890_000,    # 3.89M effective samples
+            'train_samples': 2_720_000,    # 2.72M
+            'val_samples':   580_000,      # 0.58M
+            'test_samples':  580_000,      # 0.58M
+            'anomaly_ratio': 0.042,        # 4.2% (test)
+            'monitoring_days': 45,
+            'inter_annotator_kappa': 0.92,
+        },
+    }
+
+    # === Injection-protocol realism parameters (paper Section V-F, response R1-C5) ===
+    injection_gradual_onset_ms = (200, 800)   # fault magnitude ramped over 200-800 ms
+    injection_partial_occlusion_ratio = 0.15  # one channel occluded during 15% of events
+
     # === Random seed ===
     seed = 42
 

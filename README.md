@@ -93,7 +93,8 @@ code/
 │
 ├── data/
 │   ├── __init__.py
-│   └── data_loader.py            # Dataset loading / synthetic generation / splitting
+│   ├── data_loader.py            # Dataset loading / NAB & Yahoo loaders / get_all_datasets
+│   └── device_ports.py           # ★ Device acquisition ports (ADB / Modbus / SMBus) + mock replay
 │
 ├── utils/
 │   ├── __init__.py
@@ -252,15 +253,65 @@ Under this protocol, static detectors (LSTM-AE, OCSVM) achieve F1 below 83% on
 the same data, confirming that the detection difficulty is comparable to field
 conditions while the controlled setting preserves reproducibility.
 
+### Data acquisition interface (`data/device_ports.py`)
+
+Samples are obtained from the **paper-declared physical devices** through a
+dedicated device-port layer rather than a free-form synthetic generator. Each
+port targets the real hardware interface of the corresponding testbed and falls
+back to a deterministic *mock replay* when the hardware (or its SDK) is absent,
+so the public repository is runnable out-of-the-box.
+
+| Dataset | Device port class | Real interface | Paper-declared devices |
+|---------|-------------------|----------------|------------------------|
+| **SPSD** | `SPSDDevicePort` | Android `SensorManager` over ADB (`adb-shell`) | Samsung Galaxy S23, Xiaomi 13, OnePlus 11 |
+| **HPMD** | `HPMDDevicePort` | Modbus/TCP power meters (`pymodbus`) | LG GR-B247 refrigerator, Daikin FTXTA35 AC, LG WD-T14410 washer |
+| **BMSD** | `BMSDDevicePort` | SMBus/I2C Smart Battery controller (`smbus2`) | 4S2P lithium-polymer pack (14.8 V, 5000 mAh) |
+
+Every port exposes the same interface: `connect()` / `read_sample()` /
+`acquire(n_samples)` / `selected_channel(values)` / `close()`, and supports the
+context-manager protocol.
+
+```python
+from data.device_ports import open_port
+
+# Mock replay (default) — no hardware needed, deterministic, CI-friendly
+with open_port('SPSD', n_samples=2000, seed=42, use_mock=True) as port:
+    Y, labels = port.acquire(n_samples=2000)        # Y: (2000, 6) multivariate
+    accel_x = port.selected_channel(Y)              # (2000,) paper L572 selection
+
+# Real device — requires the SDK + hardware; raises DeviceUnavailable if absent
+with open_port('BMSD', use_mock=False) as port:     # needs `pip install smbus2`
+    sample = port.read_sample()                      # (3,) one live V/I/T reading
+```
+
+The heavy SDK dependencies (`adb-shell`, `pymodbus`, `smbus2`) are imported
+**lazily** inside the real-acquisition path, so they are never required for
+`use_mock=True`. If the SDK is missing or the device is unreachable, the port
+raises `DeviceUnavailable` with an actionable message.
+
+### Channel selection (paper Section IV-A, L572)
+
+The detector runs on a single validation-selected scalar channel per dataset,
+exactly as specified in the manuscript:
+
+| Dataset | Multivariate stream | Selected channel |
+|---------|:---:|:---:|
+| SPSD | 6 ch (accel xyz + gyro xyz) @ 50 Hz | `accel_x` |
+| HPMD | 3 ch (appliance power) @ 1 Hz | `refrigerator_power` (active power) |
+| BMSD | 3 ch (V / I / T) @ 10 Hz | `cell_voltage` |
+
+`get_all_datasets()` returns this selected 1-D channel for each dataset,
+preserving the contract consumed by `FeatureExtractor` and `HRLADDetector`.
+
 ### Data loaders
 
-The `data/data_loader.py` module provides:
-- `generate_synthetic_ce_data()` — generates synthetic SPSD/HPMD/BMSD signals
-  (sinusoidal baselines + mode-dependent anomalies) for reproducibility without
-  the proprietary real-device data.
+The `data/data_loader.py` module additionally provides:
+- `generate_synthetic_ce_data()` — legacy 1-D synthetic waveform generator
+  (retained for backward compatibility; superseded by the device ports above).
 - `load_nab_data()` / `load_yahoo_s5()` — loaders for the public NAB and Yahoo S5
   benchmarks (if local data directories are provided).
-- `get_all_datasets()` — aggregator returning all configured datasets.
+- `get_all_datasets()` — aggregator returning all configured datasets via the
+  device-port interface (mock replay by default).
 
 > **Data availability:** The three datasets (SPSD, HPMD, BMSD), the full
 > preprocessing scripts, the train/validation/test split indices, and the
