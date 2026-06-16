@@ -1,0 +1,27 @@
+# =============================================================================
+# HRLAD: Data-Driven Homotopic Reinforcement Learning for Time Series
+#         Anomaly Detection in Consumer Electronics
+# =============================================================================
+# Core dependencies (tested with Python 3.10-3.13)
+# =============================================================================
+
+# Numerical computing
+numpy>=1.24,<3.0
+scipy>=1.10
+
+# Machine learning
+scikit-learn>=1.3
+
+# Deep learning (optional but recommended for full HRLAD + deep baselines)
+torch>=2.0
+torchvision>=0.15
+
+# Statistics
+statsmodels>=0.14
+
+# Visualization (for figure reproduction)
+matplotlib>=3.7
+
+# Utilities
+PyYAML>=6.0
+tqdm>=4.65

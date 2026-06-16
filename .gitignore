@@ -1,0 +1,58 @@
+# =============================================================================
+# .gitignore for HRLAD
+# =============================================================================
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Experiment outputs
+results/
+outputs/
+*.log
+*.out
+
+# Data (large files — use data loaders to generate/download)
+data/raw/
+data/processed/
+*.csv
+*.npy
+*.pkl
+*.h5
+
+# Model checkpoints
+checkpoints/
+*.pt
+*.pth
+*.ckpt
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Misc
+.env

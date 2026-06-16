@@ -1,0 +1,390 @@
+<div align="center">
+
+# HRLAD
+### Data-Driven Homotopic Reinforcement Learning for Time Series Anomaly Detection in Consumer Electronics
+
+<p>
+  <a href="#"><img src="https://img.shields.io/badge/Python-3.10+-blue.svg" alt="Python"></a>
+  <a href="#"><img src="https://img.shields.io/badge/PyTorch-2.0+-ee4a2b.svg" alt="PyTorch"></a>
+  <a href="#"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License"></a>
+  <a href="#"><img src="https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg" alt="Platform"></a>
+  <a href="#"><img src="https://img.shields.io/badge/IEEE%20TCE-2026-00629b.svg" alt="IEEE TCE"></a>
+</p>
+
+<p><em>A unified framework integrating Markov-switching latent-mode modeling,
+homotopy-based policy continuation, and data-driven online adaptation
+for anomaly detection in consumer-electronics time series.</em></p>
+
+</div>
+
+---
+
+## 📖 Table of Contents
+
+- [Overview](#-overview)
+- [Key Contributions](#-key-contributions)
+- [Repository Structure](#-repository-structure)
+- [Installation](#-installation)
+- [Quick Start](#-quick-start)
+- [Datasets](#-datasets)
+- [Methods](#-methods)
+- [Configuration](#-configuration)
+- [Evaluation Metrics](#-evaluation-metrics)
+- [Reproducing Paper Results](#-reproducing-paper-results)
+- [Deployment](#-deployment)
+- [Citation](#-citation)
+- [License](#-license)
+
+---
+
+## 🔭 Overview
+
+**HRLAD** (Homotopic Reinforcement Learning for Anomaly Detection) addresses three
+core challenges in consumer-electronics time-series anomaly detection:
+
+1. **Non-stationary, multi-modal data** — devices switch among operating regimes
+   (standby, active, degradation, fault), producing distribution shifts that
+   defeat static detectors.
+2. **Scarce anomaly labels** — anomalies are rare, and dense supervision is
+   unavailable during deployment.
+3. **Slow RL convergence** — standard reinforcement learning struggles with
+   large state spaces and sparse rewards in the anomaly-detection setting.
+
+HRLAD resolves these by coupling a **Markov-switching latent-mode model**
+(capturing regime dynamics), a **homotopy-based policy continuation path**
+(smoothly deforming a simple threshold detector into the optimal RL policy via a
+$\lambda$-parameterized family of Bellman operators), and a **data-driven online
+update mechanism** (incrementally refining the policy from streaming data with
+forgetting-weighted LSTD recursion — no physical device model required).
+
+---
+
+## 🌟 Key Contributions
+
+| # | Contribution | Module |
+|---|---|---|
+| 1 | **Markov-switching latent-mode model** — a discrete Markov chain with mode-dependent Gaussian emissions provides a unified framework for multi-modal time series. | `models/markov_jump.py` |
+| 2 | **Homotopic RL detection framework** — a $\lambda$-parameterized path gradually transitions the policy from a threshold rule ($\lambda{=}0$) to the optimal RL strategy ($\lambda{=}1$), with provable $\gamma$-contraction and Lipschitz value continuity. | `models/homotopy_rl.py` |
+| 3 | **Data-driven online update** — kernelized LSTD with a forgetting factor refines the policy from streaming data, requiring <8% label budget. | `models/homotopy_rl.py` (`online_update`) |
+| 4 | **Comprehensive benchmark** — 12 methods (HRLAD + 11 baselines) evaluated on 3 real-device datasets with 10-seed statistical validation. | `run_experiment.py` |
+
+---
+
+## 📂 Repository Structure
+
+```
+code/
+├── README.md                     # This file
+├── requirements.txt              # Python dependencies
+├── .gitignore
+├── config.py                     # Central hyperparameter store (mirrors paper)
+├── run_experiment.py             # Main experiment runner (train + test + stats)
+│
+├── configs/
+│   └── default.yaml              # YAML configuration (editable hyperparameters)
+│
+├── models/
+│   ├── __init__.py
+│   ├── homotopy_rl.py            # ★ HRLAD: the proposed homotopic RL detector
+│   ├── markov_jump.py            #   Markov-switching latent-mode model (EM, Viterbi)
+│   ├── actor_critic.py           #   Deep actor-critic networks (DDPG-style)
+│   ├── feature_extractor.py      #   Multi-domain sliding-window feature extraction
+│   └── baselines.py              #   11 baseline detectors (see Methods below)
+│
+├── data/
+│   ├── __init__.py
+│   └── data_loader.py            # Dataset loading / synthetic generation / splitting
+│
+├── utils/
+│   ├── __init__.py
+│   └── metrics.py                # F1, AUROC, FAR, detection delay, Cohen's d
+│
+└── scripts/
+    ├── train.py                  # Standalone training entry point
+    └── evaluate.py               # Standalone evaluation entry point
+```
+
+---
+
+## 🔧 Installation
+
+### Prerequisites
+
+- **Python** ≥ 3.10
+- **pip** (or **conda**)
+
+### Step 1 — Clone
+
+```bash
+git clone https://github.com/7WD1/Papercode.git
+cd Papercode
+```
+
+### Step 2 — Create a virtual environment (recommended)
+
+```bash
+python -m venv venv
+source venv/bin/activate        # Linux / macOS
+# venv\Scripts\activate         # Windows
+```
+
+### Step 3 — Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+> **Note:** PyTorch is optional — all baselines gracefully degrade to
+> NumPy/scikit-learn fallbacks when PyTorch is unavailable. However, the full
+> HRLAD actor-critic and deep baselines (LSTM-AE, VAE-AD, Anomaly Transformer,
+> etc.) require PyTorch.
+
+---
+
+## 🚀 Quick Start
+
+### Run the full experiment (all methods × all datasets × 10 seeds)
+
+```bash
+python run_experiment.py --output-dir results/
+```
+
+### Quick smoke test (1 seed, SPSD only)
+
+```bash
+python run_experiment.py --quick
+```
+
+### Train HRLAD only
+
+```bash
+python scripts/train.py --method HRLAD --dataset SPSD --output-dir checkpoints/
+```
+
+### Evaluate a trained model
+
+```bash
+python scripts/evaluate.py --method HRLAD --dataset BMSD --checkpoint checkpoints/hrlad_bmsd.pkl
+```
+
+---
+
+## 📊 Datasets
+
+HRLAD is evaluated on three consumer-electronics time-series datasets collected
+from real devices under controlled fault injection:
+
+| Dataset | Domain | Sampling Rate | Devices | Anomaly Types | Anomaly Ratio |
+|---------|--------|:---:|:---:|:---:|:---:|
+| **SPSD** | Smartphone sensors (accelerometer + gyroscope) | 50 Hz | 3 phones | 4 | 3.7% |
+| **HPMD** | Home appliance power monitoring | 1 Hz | 3 appliances | 3 | 2.9% |
+| **BMSD** | Battery management system (V / I / T) | 10 Hz | 1 battery pack | 3 | 4.2% |
+
+**Data splitting:** Chronological 70% / 15% / 15% (train / validation / test),
+as specified in the paper.
+
+The `data/data_loader.py` module provides:
+- `generate_synthetic_ce_data()` — generates synthetic SPSD/HPMD/BMSD signals
+  (sinusoidal baselines + mode-dependent anomalies) for reproducibility without
+  the proprietary real-device data.
+- `load_nab_data()` / `load_yahoo_s5()` — loaders for the public NAB and Yahoo S5
+  benchmarks (if local data directories are provided).
+- `get_all_datasets()` — aggregator returning all configured datasets.
+
+> **Data availability:** All three datasets, preprocessing scripts, and split
+> indices will be released upon paper acceptance. Representative samples are
+> provided as supplementary material.
+
+---
+
+## 🧪 Methods
+
+### Proposed Method: HRLAD
+
+The HRLAD detector (`models/homotopy_rl.py` → `HRLADDetector`) implements the
+complete pipeline:
+
+```
+Raw signal y_t
+    │
+    ▼
+┌─────────────────────┐
+│  Feature Extraction │  ← Sliding window (w=64) → 4 time-domain + 4 FFT = dim 8
+│  (Z-score norm)     │
+└────────┬────────────┘
+         │ x_t
+         ▼
+┌─────────────────────┐
+│  Markov-Switching   │  ← EM estimates transition matrix Π and mode emissions
+│  Latent-Mode Model  │     Viterbi decodes latent mode sequence s_t
+└────────┬────────────┘
+         │ Π̂, ŝ_t
+         ▼
+┌─────────────────────┐
+│  Homotopic RL       │  ← λ: 0 → 1   (affine reward interpolation)
+│  Detection Framework│     R_λ = (1-λ)R₀ + λR
+│                     │     Policy iteration with warm-start along λ-path
+│  • LSTD evaluation  │     Kernelized LSTD with RBF features
+│  • Actor-Critic     │     DDPG-style deep refinement (optional)
+└────────┬────────────┘
+         │ π_λ
+         ▼
+┌─────────────────────┐
+│  Online Adaptive    │  ← Forgetting-weighted LSTD (ζ=0.97, N_eff≈33)
+│  Detection          │     Delayed-feedback label budget < 8% of test set
+└─────────────────────┘
+         │
+         ▼
+   Anomaly decision: {Normal, Warning, Alarm}
+```
+
+### Baselines (11 methods)
+
+All baselines are implemented in `models/baselines.py` with a unified
+`fit_predict(values, labels)` interface:
+
+| Method | Type | Key Idea |
+|--------|------|----------|
+| ARIMA | Statistical | Residual-based thresholding on ARIMA forecasts |
+| Isolation Forest | Classical ML | Tree-based anomaly isolation |
+| LSTM-AE | Deep AE | Reconstruction error from LSTM autoencoder |
+| VAE-AD | Deep AE | Variational autoencoder reconstruction |
+| USAD | Deep AE | Dual-encoder adversarial autoencoder |
+| Anomaly Transformer | Transformer | Prior-association discrepancy |
+| TimesNet | Transformer | 2D-transformed temporal forecasting residual |
+| PatchTST-AD | Transformer | Patch-level forecasting error |
+| DCdetector | Transformer | Dual-attention contrastive detection |
+| MAUT (MemST) | Memory | Memory-augmented U-Transformer |
+| iTransformer-AD | Transformer | Inverted-transformer forecasting error |
+| TranAD (CARD) | Transformer | Self-conditioning adversarial reconstruction |
+| RL-AD | Reinforcement Learning | DQN-based binary detection (Q-margin) |
+
+---
+
+## ⚙️ Configuration
+
+Hyperparameters are managed in two ways:
+
+1. **`config.py`** — a Python class with all defaults (mirrors paper Table III).
+2. **`configs/default.yaml`** — an editable YAML file for experiment customization.
+
+Key hyperparameters (as reported in the paper):
+
+| Parameter | Symbol | Value |
+|-----------|:---:|:---:|
+| Window length | $w$ | 64 |
+| Feature dimension | $d$ | 8 |
+| Discount factor | $\gamma$ | 0.95 |
+| Homotopy step | $\Delta\lambda$ | 0.15 |
+| Forgetting factor | $\zeta$ | 0.97 ($N_\text{eff} \approx 33$) |
+| Actor learning rate | — | $3 \times 10^{-4}$ |
+| Critic learning rate | — | $10^{-3}$ |
+| Replay buffer size | — | 50,000 |
+| Polyak coefficient | $\tau$ | 0.005 |
+| ε-greedy schedule | — | 1.0 → 0.01 over 200 episodes |
+| Hidden layers | — | [256, 128, 64] |
+| Number of seeds | — | 10 |
+
+---
+
+## 📈 Evaluation Metrics
+
+All methods are evaluated on:
+
+| Metric | Description |
+|--------|-------------|
+| **F1** | Harmonic mean of precision and recall (pointwise) |
+| **AUROC** | Area under the ROC curve |
+| **FAR** | False alarm rate (false positives / total negatives) |
+| **DD** | Detection delay (steps from event onset to first correct alarm) |
+| **Cohen's *d*** | Effect size between HRLAD and each baseline |
+| **Bootstrap 95% CI** | 10,000-resample confidence intervals |
+| **Paired *t*-test** | Statistical significance ($\alpha = 0.05$) |
+| **Wilcoxon signed-rank** | Non-parametric significance test |
+| **Holm–Bonferroni** | Multiple-comparison correction |
+
+Reported main results (F1 %):
+
+| Method | SPSD | HPMD | BMSD |
+|--------|:---:|:---:|:---:|
+| **HRLAD (Proposed)** | **93.5** | **91.2** | **92.1** |
+| TranAD | 88.3 | 85.9 | 87.2 |
+| iTransformer-AD | 87.9 | 85.5 | 86.8 |
+| RL-AD | 87.8 | 85.2 | 86.5 |
+
+---
+
+## 🔁 Reproducing Paper Results
+
+### Full experiment (≈ 4 hours on RTX 4090)
+
+```bash
+python run_experiment.py \
+    --seeds 42 123 456 789 2024 314 271 1618 999 2048 \
+    --datasets SPSD HPMD BMSD \
+    --methods HRLAD LSTM-AE VAE-AD USAD Anomaly-Transformer \
+              TimesNet PatchTST-AD DCdetector MemST iTransformer-AD \
+              CARD RL-AD \
+    --output-dir results/
+```
+
+### Generate all figures
+
+The figure-generation scripts are located in the `experiment/` directory of the
+main project workspace. To reproduce all figures, run from the project root:
+
+```bash
+python experiment/generate_all_figures.py
+```
+
+---
+
+## 🖥️ Deployment
+
+HRLAD is designed for resource-constrained consumer-electronics devices.
+Reported deployment costs:
+
+| Platform | Latency (ms/sample) | Memory (MB) | Energy (mJ/1k samples) |
+|----------|:---:|:---:|:---:|
+| RTX 4090 (GPU) | 0.048 | 1,800 | — |
+| i9-13900K (CPU) | 1.92 | 642 | — |
+| Jetson Nano (edge, FP16) | 1.85 | 410 | 1,860 |
+| Raspberry Pi 4 (edge) | 6.74 | 386 | 5,230 |
+
+> All platforms satisfy the real-time budget at their respective data rates
+> (50 Hz / 10 Hz / 1 Hz). Model size: **245K parameters**.
+
+---
+
+## 📝 Citation
+
+If you find this work useful, please cite:
+
+```bibtex
+@article{jiang2026hrlad,
+  title   = {Data-Driven Homotopic Reinforcement Learning for Time Series
+             Anomaly Detection in Consumer Electronics},
+  author  = {Jiang, Wen-Dong and Chang, Chih-Yung and Huang, Tzu-Chia
+             and Gao, Shu-Jian and Wang, Chong and Roy, Diptendu Sinha},
+  journal = {IEEE Transactions on Consumer Electronics},
+  year    = {2026},
+  note    = {Manuscript ID: TCE-2026-04-1642}
+}
+```
+
+---
+
+## 📄 License
+
+This project is licensed under the **MIT License** — see the
+[LICENSE](LICENSE) file for details.
+
+---
+
+<div align="center">
+
+<p><strong>Repository:</strong> <a href="https://github.com/7WD1/Papercode">https://github.com/7WD1/Papercode</a></p>
+
+<p><em>For questions, please contact: wendongjiang@ieee.org</em></p>
+
+</div>

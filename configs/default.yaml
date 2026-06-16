@@ -1,0 +1,96 @@
+# =============================================================================
+# Default configuration for HRLAD
+# This YAML mirrors config.py and the hyperparameters reported in the paper
+# (IEEE Transactions on Consumer Electronics).
+# =============================================================================
+
+# --- Feature Extraction ---
+feature_extraction:
+  window_size: 64           # Sliding-window length w
+  stride: 1                 # Window stride
+  n_fft_components: 4       # Number of FFT magnitude bins (m)
+  feature_dim: 8            # Total feature dimension d (4 time-domain + 4 FFT)
+  normalization: zscore     # Per-channel Z-score normalization
+
+# --- Markov-Switching Latent-Mode Model ---
+markov_jump:
+  n_modes: 4                # Normal, Degradation, Warning, Fault
+  em_max_iter: 100          # EM iterations for transition estimation
+  em_tol: 1.0e-6
+  online_decay: 0.1         # Forgetting factor for online transition update
+
+# --- Homotopic RL ---
+homotopy_rl:
+  lambda_init: 0.0          # Starting homotopy parameter
+  lambda_step: 0.15         # Adaptive step Delta-lambda
+  lambda_max: 1.0           # Target homotopy parameter
+  gamma: 0.95               # Discount factor
+  eta_adapt: 0.5            # Adaptive lambda progression rate
+  epsilon_V: 1.0e-3         # Value convergence tolerance
+  # Reward weights (xi*)
+  alpha: 1.0                # Detection reward weight
+  beta: 0.5                 # False-alarm penalty weight
+  beta_w: 0.2               # Warning-level penalty weight
+  eta: 0.1                  # Detection-delay penalty weight
+  # Auxiliary policy (lambda=0) thresholds
+  tau: null                 # Warning threshold (dataset-specific, see paper Table)
+  tau_h: null               # Alarm threshold  (dataset-specific, see paper Table)
+  alpha_rho: 1.0            # Sigmoid steepness
+
+# --- LSTD / Kernelized Value Estimation ---
+lstd:
+  rbf_sigma: 1.0            # RBF kernel bandwidth
+  lstd_reg: 1.0e-4          # Tikhonov regularization
+  forgetting_factor: 0.97   # Online forgetting factor zeta (N_eff ≈ 33)
+  n_basis_functions: 20     # Number of RBF centers
+
+# --- Policy Iteration ---
+policy_iteration:
+  max_iter: 50              # Maximum policy-iteration steps
+  tol: 1.0e-3               # Convergence tolerance
+  adaptive_step: true       # Use adaptive lambda progression
+
+# --- Actor-Critic Network (Paper Table III) ---
+actor_critic:
+  hidden_layers: [256, 128, 64]   # MLP architecture
+  activation: relu
+  dropout: 0.1
+  batch_norm: true
+  actor_lr: 3.0e-4
+  critic_lr: 1.0e-3
+  replay_buffer_size: 50000
+  target_update_freq: 5
+  target_smooth_coeff: 0.005      # Polyak tau
+  epsilon_start: 1.0
+  epsilon_end: 0.01
+  epsilon_decay_episodes: 200
+
+# --- Training ---
+training:
+  offline_epochs: 10
+  batch_size: 256
+  learning_rate: 1.0e-3
+
+# --- Online Detection ---
+online_detection:
+  alarm_threshold: 0.5
+  tau_d: 0.5               # Detection output threshold
+  verification_delay: 50    # Delayed-feedback steps (delta)
+
+# --- Evaluation ---
+evaluation:
+  train_ratio: 0.70
+  val_ratio: 0.15
+  test_ratio: 0.15
+  split_type: chronological
+
+# --- Multi-seed Reproducibility ---
+reproducibility:
+  n_repeats: 10
+  seeds: [42, 123, 456, 789, 2024, 314, 271, 1618, 999, 2048]
+
+# --- Datasets ---
+datasets:
+  - SPSD    # Smartphone Sensor Data
+  - HPMD    # Home Appliance Power Monitoring Data
+  - BMSD    # Battery Management System Data
